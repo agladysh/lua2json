@@ -1,0 +1,12 @@
+TODO
+====
+
+-- Support pretty-print output
+
+-- Tune command-line options. At least:
+
+   Support long --options
+   --output=<path>      (default: - /stdout/)
+   + filename to read   (default: - /stdin/)
+
+-- Add a proper test suite

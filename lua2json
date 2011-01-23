@@ -1,0 +1,166 @@
+#! /bin/bash
+
+VERSION="v0.1"
+
+# Detect Lua interpreter (prefer LuaJIT 2)
+if [ ! -z "${LUA}" ]; then
+  if [ -z "$(which ${LUA})" ]; then
+    LUA=""
+  fi
+fi
+
+if [ -z "${LUA}" ]; then
+  LUA="luajit2"
+  if [ -z "$(which ${LUA})" ]; then
+    LUA="luajit"
+    if [ -z "$(which ${LUA})" ]; then
+      LUA="lua"
+
+      if [ -z "$(which ${LUA})" ]; then
+        echo "Error: luajit2, luajit and lua executables not found" >&2
+        exit 1
+      fi
+    fi
+  fi
+fi
+
+function version()
+{
+  cat << EOF
+Lua to JSON translator ${VERSION}
+
+EOF
+}
+
+function usage()
+{
+  cat << EOF
+Usage:
+
+  $0 [options] < in.lua > out.json
+
+Options:
+
+  -h    Print this text
+  -v    Print script version
+  -O    Force tables to be serialized as objects
+        (default: off)
+  -e    Do not print terminating EOL (default: do print)
+  -r    Prefix "return " to the input before loading (default: do not prefix)
+
+EOF
+# TODO: Support this!
+#   -n    Do not pretty-print JSON code (default: do pretty-print)
+}
+
+NO_PRETTY_PRINT=true # TODO: Must be false
+FORCE_OBJECTS=false
+SKIP_TERMINATING_EOL=false
+PREFIX_WITH_RETURN=false
+
+while getopts ":hvnOer" opt; do
+  case ${opt} in
+    h)
+      version
+      usage
+      exit 0
+      ;;
+    v)
+      version
+      exit 0
+      ;;
+# TODO: Implement
+#    n)
+#      NO_PRETTY_PRINT=true
+#      ;;
+    O)
+      FORCE_OBJECTS=true
+      ;;
+    e)
+      SKIP_TERMINATING_EOL=true
+      ;;
+    r)
+      PREFIX_WITH_RETURN=true
+      ;;
+    \?)
+      echo "unknown option: -${OPTARG}" >&2
+      exit 1
+      ;;
+    :)
+      echo "option -${OPTARG} requires an argument" >&2
+      exit 1
+      ;;
+  esac
+done
+
+${LUA} -e "
+
+local NO_PRETTY_PRINT = ${NO_PRETTY_PRINT}
+local FORCE_OBJECTS = ${FORCE_OBJECTS}
+local SKIP_TERMINATING_EOL = ${SKIP_TERMINATING_EOL}
+local PREFIX_WITH_RETURN = ${PREFIX_WITH_RETURN}
+
+--------------------------------------------------------------------------------
+
+pcall(require, 'luarocks.require') -- Ignoring errors
+
+local json_encode, json_util
+do
+  local json, err = pcall(require, 'json')
+  if not json then
+    io.stdout:write(
+        err, '\n\n',
+        'try running \'luarocks install luajson\'', '\n'
+      )
+    io.stdout:flush()
+    os.exit(1)
+  end
+
+  json_util = require('json.util')
+  json_encode = require('json.encode')
+end
+
+--------------------------------------------------------------------------------
+
+local input = assert(io.stdin:read('*a'))
+
+-- TODO: Sandbox data?
+if PREFIX_WITH_RETURN then
+  input = 'return ' .. input
+end
+
+local data = assert(
+    assert(loadstring(input))()
+  )
+
+local encode_options = nil
+if not NO_PRETTY_PRINT then
+  error('TODO: Implement!')
+end
+
+if FORCE_OBJECTS then
+  encode_options = json_util.merge(
+      {
+        array =
+        {
+          isArray = function() return false end;
+        };
+      },
+      encode_options
+    )
+end
+
+local data, err = json_encode(data, encode_options)
+if err then
+  error('luajson error: ' .. err)
+end
+
+io.stdout:write(data)
+
+if not SKIP_TERMINATING_EOL then
+  io.stdout:write('\n')
+end
+
+io.stdout:flush()
+
+"
