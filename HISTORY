@@ -1,3 +1,13 @@
+Version 0.1.1 (2011-01-22)
+==========================
+
+Maintenance release:
+
+  * Improved error reporting.
+  * By default data is loaded inside a clean environment
+    with global environment protection.
+  * Some minor documentation enhancements.
+
 Version 0.1 (2011-01-26)
 ========================
 
